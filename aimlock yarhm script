@@ -1,0 +1,93 @@
+-- Services
+local players = game:GetService("Players")
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local workspace = game:GetService("Workspace")
+
+-- Local player
+local localPlayer = players.LocalPlayer
+local camera = workspace.CurrentCamera
+local mouse = localPlayer:GetMouse()
+
+-- GUI Elements
+local screenGui = script.Parent.Parent
+local aimButton = script.Parent
+
+-- Settings
+local aimlockKey = Enum.KeyCode.B
+local isAiming = false
+local aimlockEnabled = false
+local target = nil
+local aimRadius = 100
+
+-- Function to check if a part is visible
+local function isPartVisible(part)
+    local origin = camera.CFrame.Position
+    local direction = (part.Position - origin).unit * (part.Position - origin).magnitude
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {localPlayer.Character, part}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result == nil
+end
+
+-- Function to find the closest target
+local function findClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = aimRadius
+
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local partPosition = player.Character.HumanoidRootPart.Position
+            local distance = (partPosition - camera.CFrame.Position).magnitude
+
+            if distance < shortestDistance and isPartVisible(player.Character.HumanoidRootPart) then
+                closestTarget = player.Character
+                shortestDistance = distance
+            end
+        end
+    end
+
+    return closestTarget
+end
+
+-- Aim at the target
+local function aimAtTarget()
+    if target and target:FindFirstChild("HumanoidRootPart") then
+        local targetPart = target.HumanoidRootPart
+        local cameraPosition = camera.CFrame.Position
+        local aimPosition = targetPart.Position
+
+        local direction = (aimPosition - cameraPosition).unit
+        local newCameraCFrame = CFrame.new(cameraPosition, cameraPosition + direction)
+
+        camera.CFrame = newCameraCFrame
+    end
+end
+
+-- Button click handler
+aimButton.MouseButton1Click:Connect(function()
+    aimlockEnabled = true
+    aimButton.Text = "Aimlock Activated"
+end)
+
+-- Input handler
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == aimlockKey and aimlockEnabled then
+        isAiming = not isAiming
+        if isAiming then
+            target = findClosestTarget()
+        else
+            target = nil
+        end
+    end
+end)
+
+-- Update loop
+runService.RenderStepped:Connect(function()
+    if isAiming and target then
+        aimAtTarget()
+    end
+end)
